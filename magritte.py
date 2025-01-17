@@ -4,15 +4,15 @@ import os
 import json
 from playwright.async_api import async_playwright
 
-class GauguinScraper:
+class MagritteScraper:
   def __init__(self,
-               url="https://digitalprojects.wpi.art/gauguin/artworks?page=1",
-               base_url="https://digitalprojects.wpi.art"):
+               url="https://fine-arts-museum.be/fr/la-collection/artist/magritte-rena?string=magritte&page=1",
+               base_url="https://fine-arts-museum.be"):
       self.hrefs = []
       self.base_url = base_url
       self.url = url
       self.data = []
-      self.pages = 7
+      self.pages = 8
 
   async def scrape(self):
       async with async_playwright() as p:
@@ -22,32 +22,30 @@ class GauguinScraper:
           await self.go_to(self.url)
           await self.skip_cookies()
           await self.get_hrefs()
+          time.sleep(15)
           self.page.set_default_timeout(10000)
           await self.get_data()
           self.save_data()
           await self.browser.close()
 
+
   async def skip_cookies(self):
-      await self.wait_for_el('.button-disabled')
-      await self.page.eval_on_selector(
-          '.button-disabled', 'el => el.removeAttribute("disabled")')
-      await self.page.click('.button-disabled')
+      element = await self.find_el('#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')
+      await element.click()
+
 
   async def find_el(self, selector: str):
       await self.wait_for_el(selector)
       return await self.page.query_selector(selector)
+
 
   async def find_els(self, selector: str):
       await self.wait_for_el(selector)
       return await self.page.query_selector_all(selector)
 
 
-
-
   async def wait_for_el(self, selector: str):
       await self.page.wait_for_selector(selector)
-
-
 
 
   async def go_to(self, url, tabs=False):
@@ -67,19 +65,15 @@ class GauguinScraper:
     for i in range(self.pages):
         if i > 0:
             pagination = await self.find_el(
-                'cpd-controls-pagination > button:last-child')
+                '.pagination ul > li:last-child > a')
             await pagination.click()
-            time.sleep(5)
         print(f"{i}\n\n\n")
         el = await self.find_els(
-            '.artwork-search-results > article:not(.not-included) > a')
+            '.artworks li > a')
         for e in el:
             self.hrefs.append(await e.get_attribute('href'))
     print(self.hrefs)
         
-
-
-
 
   async def get_image(self, href):
       image = "null"
@@ -87,21 +81,15 @@ class GauguinScraper:
       while image == "null" and i < 30:
           try:
             image = await self.find_el(
-                ".not-full-screen-image-container > img")
+                ".image > img")
           except Exception as e:
               print(f"Error: {e}\n\nOn page: {href}")
               return None
-          image = await image.get_attribute('srcset')
-          image = image.split(",")[0].split(" ")[0]
+          image = await image.get_attribute('src')
+          #image = image.split(",")[0].split(" ")[0]
           time.sleep(0.5)
           i += 1
-
-
-
-
       return image
-
-
 
 
   def curl_image(self, image, id):
@@ -109,7 +97,6 @@ class GauguinScraper:
         os.mkdir("images")
     except FileExistsError:
         pass
-
     if image != "null":
         image_response = requests.get(image)
         if image_response.status_code == 200:
@@ -117,26 +104,28 @@ class GauguinScraper:
                 img_file.write(image_response.content)
 
 
-
-
   async def get_title(self):
-      title = await self.find_el(".details h1")
-      title = await title.inner_text()
-      return title
-
-
+    title_element = await self.find_el(".span8 h2")
+    full_text = await title_element.inner_text()
+    if '"' in full_text:
+        title = full_text.split('"')[1]  
+    else:
+        title = full_text.strip() 
+    return title
 
 
   async def get_info(self):
-      info = await self.find_els("article[_ngcontent-ng-c2311764719] p > p")
-      return {
-          "date": await info[0].inner_text(),
-          "technique": await info[1].inner_text(),
-          "dimensions": await info[2].inner_text(),
-          "signature": await info[3].inner_text(),
-      }
-
-
+    list_items = await self.find_els(".artwork-description ul li")
+    li_texts = [await li.inner_text() for li in list_items]
+    info = {
+        "technique": li_texts[0] if len(li_texts) > 0 else None,
+        "signature": li_texts[1] if len(li_texts) > 1 else None,
+        "dimensions": li_texts[2] if len(li_texts) > 2 else None,
+        "origin": li_texts[3] if len(li_texts) > 3 else None
+    }
+    date_element = await self.find_el(".span8 .inv")
+    info["date"] = (await date_element.inner_text()).strip() if date_element else None
+    return info
 
 
   def save_data(self):
@@ -148,54 +137,6 @@ class GauguinScraper:
           json.dumps([d for d in self.data], indent=4, ensure_ascii=False))
 
 
-
-
-  async def get_provenance(self):
-      provenances = None
-      try:
-          provenances = await self.find_els("#provenance p p")
-      except Exception as e:
-          print(e)
-          return None
-      return [await p.inner_text() for p in provenances]
-
-
-
-
-  async def get_exhibitions(self):
-      exhibitions = None
-      try:
-          exhibitions = await self.find_els("#exhibition article")
-      except Exception as e:
-          print(e)
-          return None
-      arr = []
-      for paragraph in exhibitions:
-          await paragraph.wait_for_selector("p")
-          ps = await paragraph.query_selector_all("p")
-          arr.append(", ".join([await p.inner_text() for p in ps]))
-      return arr
-
-
-
-
-  async def get_bibliography(self):
-      bibliography = None
-      try:
-          bibliography = await self.find_els("#publication article")
-      except Exception as e:
-          print(e)
-          return None
-      arr = []
-      for paragraph in bibliography:
-          await paragraph.wait_for_selector("p")
-          ps = await paragraph.query_selector_all("p")
-          arr.append(", ".join([await p.inner_text() for p in ps]))
-      return arr
-
-
-
-
   async def get_data(self):
       for index, href in enumerate(self.hrefs):
           print(f"Processing artwork {index + 1}/{len(self.hrefs)}: {href}")
@@ -205,29 +146,24 @@ class GauguinScraper:
               continue
           title = await self.get_title()
           get_info = await self.get_info()
-          provenance = await self.get_provenance()
-          exhibitions = await self.get_exhibitions()
-          bibliography = await self.get_bibliography()
 
           self.curl_image(image, index)
           self.data.append({
               "id": index,
               "title": title,
               "date": get_info["date"],
-              "name_of_artist": "Paul Gauguin",
+              "name_of_artist": "René Magritte",
               "technique": get_info["technique"],
               "dimensions": get_info["dimensions"],
               "signature": get_info["signature"],
+              "origin": get_info["origin"],
               "location": None,
               "image": image,
-              "provenance": provenance,
-              "exhibitions": exhibitions,
-              "bibliography": bibliography,
           })
 
 
 if __name__ == "__main__":
    import asyncio
-   scraper = GauguinScraper()
+   scraper = MagritteScraper()
    asyncio.run(scraper.scrape())
 
