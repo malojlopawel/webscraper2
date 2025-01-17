@@ -2,6 +2,7 @@ import time
 import requests
 import os
 import json
+import re
 from playwright.async_api import async_playwright
 
 class MagritteScraper:
@@ -115,17 +116,27 @@ class MagritteScraper:
     return title
 
 
-  async def get_info(self):
+  import re
+
+async def get_info(self):
     list_items = await self.find_els(".artwork-description ul li")
     li_texts = [await li.inner_text() for li in list_items]
+    
     info = {
         "technique": li_texts[0] if len(li_texts) > 0 else None,
         "signature": li_texts[1] if len(li_texts) > 1 else None,
         "dimensions": li_texts[2] if len(li_texts) > 2 else None,
         "origin": li_texts[3] if len(li_texts) > 3 else None
     }
+
     date_element = await self.find_el(".span8 .inv")
-    info["date"] = (await date_element.inner_text()).strip() if date_element else None
+    if date_element:
+        full_date_text = (await date_element.inner_text()).strip()
+        match = re.search(r"\((.*?)\)", full_date_text) 
+        info["date"] = match.group(1) if match else None
+    else:
+        info["date"] = None
+
     return info
 
 
