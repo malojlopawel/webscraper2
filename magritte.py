@@ -76,20 +76,21 @@ class MagritteScraper:
         
 
   async def get_image(self, href):
-      image = "null"
-      i = 0
-      while image == "null" and i < 30:
-          try:
-            image = await self.find_el(
-                ".image > img")
-          except Exception as e:
-              print(f"Error: {e}\n\nOn page: {href}")
-              return None
-          image = await image.get_attribute('src')
-          #image = image.split(",")[0].split(" ")[0]
-          time.sleep(0.5)
-          i += 1
-      return image
+    image = None
+    i = 0
+    while not image and i < 30:
+        try:
+            image_element = await self.find_el(".image > img")
+            if image_element:
+                image = await image_element.get_attribute('src')
+        except Exception as e:
+            print(f"Error: {e}\n\nOn page: {href}")
+            return None
+        time.sleep(0.5)
+        i += 1
+    if image and image.startswith("/"):
+        image = f"{self.base_url}{image}"
+    return image
 
 
   def curl_image(self, image, id):
@@ -157,7 +158,6 @@ class MagritteScraper:
               "dimensions": get_info["dimensions"],
               "signature": get_info["signature"],
               "origin": get_info["origin"],
-              "location": None,
               "image": image,
           })
 
