@@ -130,8 +130,8 @@ class MagritteScraper:
     date_element = await self.find_el(".span8 .inv")
     if date_element:
         full_date_text = (await date_element.inner_text()).strip()
-        match = re.search(r"(ca\.\s?\d{4}|\(?\d{4}\)?)", full_date_text) 
-        info["date"] = match.group(1).strip("()") if match else None
+        match = re.search(r"(ca\.\s?19\d{2}|\(?19\d{2}\)?)", full_date_text, re.IGNORECASE)
+        info["date"] = match.group(1).strip("()") if match else None  # Removes parentheses if present
     else:
         info["date"] = None
 
