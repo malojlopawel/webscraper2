@@ -129,7 +129,6 @@ class MagritteScraper:
         "origin": li_texts[3] if len(li_texts) > 3 else None
     }
 
-    
     date_element = await self.find_el(".span8 .inv")
     if date_element:
         full_date_text = (await date_element.inner_text()).strip()
