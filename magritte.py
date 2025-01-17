@@ -114,9 +114,7 @@ class MagritteScraper:
     else:
         title = full_text.strip() 
     return title
-
-
-  import re
+  
 
   async def get_info(self):
     list_items = await self.find_els(".artwork-description ul li")
@@ -132,8 +130,8 @@ class MagritteScraper:
     date_element = await self.find_el(".span8 .inv")
     if date_element:
         full_date_text = (await date_element.inner_text()).strip()
-        match = re.search(r"\((.*?)\)", full_date_text)  
-        info["date"] = match.group(1) if match else None
+        match = re.search(r"(ca\.\s?\d{4}|\(?\d{4}\)?)", full_date_text) 
+        info["date"] = match.group(1).strip("()") if match else None
     else:
         info["date"] = None
 
