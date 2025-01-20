@@ -23,7 +23,7 @@ class MagritteScraper:
           await self.go_to(self.url)
           await self.skip_cookies()
           await self.get_hrefs()
-          time.sleep(15)
+          time.sleep(2)
           self.page.set_default_timeout(10000)
           await self.get_data()
           self.save_data()
